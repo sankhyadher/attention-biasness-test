@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Attentional Bias Eye-Tracking Test</title>
+    <style>
+        body { background: #fafafa; font-family: 'Segoe UI', Arial, sans-serif; text-align: center; }
+        #container { width: 100vw; height: 70vh; margin-top: 6vh; position: relative; }
+        .symbol {
+            width: 170px; height: 170px;
+            display: inline-block; margin: 0 60px;
+            font-size: 80px;
+            border: 4px solid transparent; border-radius: 20px;
+            background: #fff;
+            vertical-align: middle;
+            position: relative;
+        }
+        #message {
+            font-size: 1.7em; margin: 25px; color: #194884;
+        }
+        #digit {
+            font-size: 2.6em;
+            color: #e73c3c;
+            position: absolute;
+            top: 63px;
+            left: 67px;
+        }
+        .aoi-reward { border-color: #3cb371; }
+        .aoi-neutral { border-color: #0088ff; }
+    </style>
+</head>
+<body>
+    <h2>Visual Attention Test</h2>
+    <div id="message">Focus on the screen. The task will begin soon.</div>
+    <div id="container"></div>
+    <script>
+        // SVG shapes
+        const shapeSVGs = {
+          'sphere': `<svg width="80" height="80" viewBox="0 0 80 80"><defs><radialGradient id="g1" cx="50%" cy="40%" r="50%"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#a3f"/></radialGradient></defs><ellipse cx="40" cy="40" rx="32" ry="32" fill="url(#g1)" stroke="#5c2a7c" stroke-width="4"/></svg>`,
+          'cube': `<svg width="80" height="80" viewBox="0 0 80 80"><defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#3a6"/></linearGradient></defs><rect x="16" y="16" width="48" height="48" rx="8" fill="url(#g2)" stroke="#2a7c5c" stroke-width="4"/></svg>`,
+          'pyramid': `<svg width="80" height="80" viewBox="0 0 80 80"><defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#a3f"/></linearGradient></defs><polygon points="40,12 68,68 12,68" fill="url(#g3)" stroke="#5c2a7c" stroke-width="4"/></svg>`,
+          'cylinder': `<svg width="80" height="80" viewBox="0 0 80 80"><defs><linearGradient id="g4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fff"/><stop offset="100%" stop-color="#3a6"/></linearGradient></defs><ellipse cx="40" cy="20" rx="24" ry="10" fill="#fff" opacity="0.5"/><rect x="16" y="20" width="48" height="40" rx="24" fill="url(#g4)" stroke="#2a7c5c" stroke-width="4"/><ellipse cx="40" cy="60" rx="24" ry="10" fill="#3a6" stroke="#2a7c5c" stroke-width="4"/></svg>`
+        };
+        // Symbols
+        const rewardSymbols = [
+            { name: "sphere",   svg: shapeSVGs['sphere'] },
+            { name: "pyramid",  svg: shapeSVGs['pyramid'] }
+        ];
+        const neutralSymbols = [
+            { name: "cube",     svg: shapeSVGs['cube'] },
+            { name: "cylinder", svg: shapeSVGs['cylinder'] }
+        ];
+
+        // Digit trial info
+        const digitTrials = [2, 6];
+        const digits = ['3','7','5','2','9'];
+
+        // Generate unique reward v neutral combinations, both orders (never same on both sides)
+        let pairings = [];
+        for (let r = 0; r < rewardSymbols.length; r++) {
+            for (let n = 0; n < neutralSymbols.length; n++) {
+                // Reward left, neutral right
+                pairings.push({
+                    left: rewardSymbols[r],
+                    right: neutralSymbols[n],
+                    leftReward: true
+                });
+                // Neutral left, reward right
+                pairings.push({
+                    left: neutralSymbols[n],
+                    right: rewardSymbols[r],
+                    leftReward: false
+                });
+            }
+        }
+        // To get 10 trials: shuffle and duplicate random pairings if needed
+        function shuffle(arr) {
+            let a = arr.slice();
+            for (let i = a.length - 1; i > 0; i--) {
+                let j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+        let trials = shuffle(pairings);
+        while (trials.length < 10) {
+            trials = shuffle(trials.concat(shuffle(pairings)));
+        }
+        trials = trials.slice(0, 10);
+
+        let trialIdx = -1;
+        const container = document.getElementById('container');
+        const message = document.getElementById('message');
+        let testTimeout;
+
+        function getSymbolDiv(symbolObj, isReward, digit) {
+            const div = document.createElement('div');
+            div.className = 'symbol ' + (isReward ? 'aoi-reward' : 'aoi-neutral');
+            div.setAttribute('data-type', isReward ? 'reward' : 'neutral');
+            div.innerHTML = symbolObj.svg;
+            if (digit) {
+                let d = document.createElement('div');
+                d.id = 'digit';
+                d.innerText = digit;
+                div.appendChild(d);
+            }
+            return div;
+        }
+
+        setTimeout(() => {
+            message.innerHTML = "Keep your eyes on each pair of shapes.";
+            runNextTrial();
+        }, 1800);
+
+        function runNextTrial() {
+            trialIdx++;
+
+            if(trialIdx >= trials.length) {
+                container.innerHTML = "";
+                message.innerHTML = "<b>Test complete!</b> Thank you.";
+                return;
+            }
+
+            container.innerHTML = "";
+
+            const t = trials[trialIdx];
+            // Possibly put a digit on this trial
+            let digit = null, showDigitOn = null;
+            if(digitTrials.includes(trialIdx)) {
+                digit = digits[Math.floor(Math.random() * digits.length)];
+                showDigitOn = Math.random() > 0.5 ? 'left' : 'right';
+            }
+
+            const leftDiv = getSymbolDiv(t.left, t.leftReward, (showDigitOn === 'left' ? digit : null));
+            leftDiv.id = "symbol-left";
+            const rightDiv = getSymbolDiv(t.right, !t.leftReward, (showDigitOn === 'right' ? digit : null));
+            rightDiv.id = "symbol-right";
+
+            container.appendChild(leftDiv);
+            container.appendChild(rightDiv);
+
+            testTimeout = setTimeout(runNextTrial, 2000);
+        }
+
+        document.addEventListener('keydown', function(evt) {
+            // Optional: process digit response for RT
+        });
+
+        window.onbeforeunload = () => clearTimeout(testTimeout);
+
+    </script>
+</body>
+</html>
